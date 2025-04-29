@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace FoodDelivery.DAL.Entities
+﻿namespace FoodDelivery.DAL.Entities
 {
     public class Order
     {

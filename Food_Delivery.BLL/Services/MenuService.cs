@@ -1,5 +1,5 @@
 ﻿using FoodDelivery.DAL.Entities;
-using FoodDelivery.DAL.Repositories;
+using FoodDelivery.DAL.Repositories.Interfaces;
 
 public class MenuService
 {
