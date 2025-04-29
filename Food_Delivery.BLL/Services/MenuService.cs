@@ -1,24 +1,30 @@
-﻿using FoodDelivery.DAL.Entities;
-using FoodDelivery.DAL.Repositories.Interfaces;
+﻿using AutoMapper;
+using FoodDelivery.BLL.Models;
+using FoodDelivery.DAL.UoW;
 
-public class MenuService
+namespace FoodDelivery.BLL.Services
 {
-    private readonly IMenuRepository _menuRepository;
-    private readonly IDishRepository _dishRepository;
-
-    public MenuService(IMenuRepository menuRepository, IDishRepository dishRepository)
+    public class MenuService
     {
-        _menuRepository = menuRepository;
-        _dishRepository = dishRepository;
-    }
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IMapper _mapper;
 
-    public List<Dish> GetMenuForDay(int dayOfWeekId)
-    {
-        return _menuRepository.GetDishesByDayOfWeek(dayOfWeekId);
-    }
+        public MenuService(IUnitOfWork unitOfWork, IMapper mapper)
+        {
+            _unitOfWork = unitOfWork;
+            _mapper = mapper;
+        }
 
-    public List<Dish> GetDishesByCategory(int categoryId)
-    {
-        return _dishRepository.GetByCategoryId(categoryId);
+        public List<DishDto> GetMenuForDay(int dayOfWeekId)
+        {
+            var dishes = _unitOfWork.Menus.GetDishesByDayOfWeek(dayOfWeekId);
+            return _mapper.Map<List<DishDto>>(dishes);
+        }
+
+        public List<DishDto> GetDishesByCategory(int categoryId)
+        {
+            var dishes = _unitOfWork.Dishes.GetByCategoryId(categoryId);
+            return _mapper.Map<List<DishDto>>(dishes);
+        }
     }
 }

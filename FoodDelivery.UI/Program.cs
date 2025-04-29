@@ -1,6 +1,9 @@
-﻿using FoodDelivery.DAL.Data;
-using FoodDelivery.DAL.Entities;
-using FoodDelivery.DAL.Repositories;
+﻿using FoodDelivery.BLL.Mapping;
+using FoodDelivery.BLL.Models;
+using FoodDelivery.BLL.Services;
+using FoodDelivery.DAL.Data;
+using FoodDelivery.DAL.UoW;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FoodDelivery.UI
 {
@@ -11,67 +14,92 @@ namespace FoodDelivery.UI
             Console.InputEncoding = System.Text.Encoding.UTF8;
             Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-            using (var context = new AppDbContext())
+            // Налаштовуємо DI-контейнер
+            var services = new ServiceCollection();
+            ConfigureServices(services);
+            var serviceProvider = services.BuildServiceProvider();
+
+            // Отримуємо сервіси
+            var dishService = serviceProvider.GetService<DishService>();
+            var menuService = serviceProvider.GetService<MenuService>();
+            var orderService = serviceProvider.GetService<OrderService>();
+
+            // Створюємо базу даних, якщо вона ще не існує
+            using (var context = serviceProvider.GetService<AppDbContext>())
             {
                 context.Database.EnsureCreated();
+            }
 
-                // Ініціалізуємо репозиторії
-                var dishRepository = new DishRepository(context);
-                var menuRepository = new MenuRepository(context);
-                var orderRepository = new OrderRepository(context);
+            bool isRunning = true;
+            OrderDto currentOrder = null;
 
-                // Ініціалізуємо сервіси з використанням репозиторіїв
-                var menuService = new MenuService(menuRepository, dishRepository);
-                var dishService = new DishService(dishRepository);
-                var orderService = new OrderService(orderRepository, dishRepository);
+            while (isRunning)
+            {
+                Console.WriteLine("\nОберіть дію:");
+                Console.WriteLine("1. Показати меню за днем тижня");
+                Console.WriteLine("2. Показати страви за категорією");
+                Console.WriteLine("3. Пошук страв за назвою");
+                Console.WriteLine("4. Створити нове замовлення");
+                Console.WriteLine("5. Додати страву до замовлення");
+                Console.WriteLine("6. Переглянути поточне замовлення");
+                Console.WriteLine("7. Вийти");
+                Console.Write("Ваш вибір: ");
+                string choice = Console.ReadLine();
 
-                bool isRunning = true;
-                while (isRunning)
+                switch (choice)
                 {
-                    Console.WriteLine("\nОберіть дію:");
-                    Console.WriteLine("1. Показати меню за днем тижня");
-                    Console.WriteLine("2. Показати страви за категорією");
-                    Console.WriteLine("3. Пошук страв за назвою");
-                    Console.WriteLine("4. Створити нове замовлення");
-                    Console.WriteLine("5. Додати страву до замовлення");
-                    Console.WriteLine("6. Переглянути поточне замовлення");
-                    Console.WriteLine("7. Вийти");
-
-                    Console.Write("Ваш вибір: ");
-                    string choice = Console.ReadLine();
-
-                    switch (choice)
-                    {
-                        case "1":
-                            ShowMenuByDay(menuService);
-                            break;
-                        case "2":
-                            ShowDishesByCategory(menuService);
-                            break;
-                        case "3":
-                            SearchDishes(dishService);
-                            break;
-                        case "4":
-                            CreateNewOrder(orderService);
-                            break;
-                        case "5":
-                            AddDishToOrder(orderService, dishService);
-                            break;
-                        case "6":
-                            ViewCurrentOrder(orderService);
-                            break;
-                        case "7":
-                            isRunning = false;
-                            Console.WriteLine("Дякуємо за використання нашого застосунку!");
-                            break;
-                        default:
-                            Console.WriteLine("Невірний вибір. Спробуйте ще раз.");
-                            break;
-                    }
+                    case "1":
+                        ShowMenuByDay(menuService);
+                        break;
+                    case "2":
+                        ShowDishesByCategory(menuService);
+                        break;
+                    case "3":
+                        SearchDishes(dishService);
+                        break;
+                    case "4":
+                        currentOrder = CreateNewOrder(orderService);
+                        break;
+                    case "5":
+                        if (currentOrder != null)
+                            AddDishToOrder(orderService, dishService, currentOrder.Id);
+                        else
+                            Console.WriteLine("Спочатку створіть нове замовлення.");
+                        break;
+                    case "6":
+                        if (currentOrder != null)
+                            ViewCurrentOrder(orderService, currentOrder.Id);
+                        else
+                            Console.WriteLine("Немає активного замовлення.");
+                        break;
+                    case "7":
+                        isRunning = false;
+                        Console.WriteLine("Дякуємо за використання нашого застосунку!");
+                        break;
+                    default:
+                        Console.WriteLine("Невірний вибір. Спробуйте ще раз.");
+                        break;
                 }
             }
 
             Console.ReadKey();
+        }
+
+        private static void ConfigureServices(ServiceCollection services)
+        {
+            // Реєструємо DbContext
+            services.AddDbContext<AppDbContext>();
+
+            // Реєструємо AutoMapper
+            services.AddAutoMapper(typeof(MappingProfile));
+
+            // Реєструємо Unit of Work
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // Реєструємо сервіси бізнес-логіки
+            services.AddScoped<DishService>();
+            services.AddScoped<MenuService>();
+            services.AddScoped<OrderService>();
         }
 
         static void ShowMenuByDay(MenuService menuService)
@@ -99,12 +127,12 @@ namespace FoodDelivery.UI
             }
         }
 
-        static void ShowDishesByCategory(MenuService dishService)
+        static void ShowDishesByCategory(MenuService menuService)
         {
             Console.WriteLine("Введіть ID категорії:");
             if (int.TryParse(Console.ReadLine(), out int categoryId))
             {
-                var dishes = dishService.GetDishesByCategory(categoryId);
+                var dishes = menuService.GetDishesByCategory(categoryId);
                 if (dishes.Any())
                 {
                     Console.WriteLine($"\nСтрави в категорії {categoryId}:");
@@ -143,22 +171,15 @@ namespace FoodDelivery.UI
             }
         }
 
-        static Order currentOrder = null; // Зберігаємо поточне замовлення
-
-        static void CreateNewOrder(OrderService orderService)
+        static OrderDto CreateNewOrder(OrderService orderService)
         {
-            currentOrder = orderService.CreateOrder();
-            Console.WriteLine($"Створено нове замовлення з ID: {currentOrder.Id}");
+            var order = orderService.CreateOrder();
+            Console.WriteLine($"Створено нове замовлення з ID: {order.Id}");
+            return order;
         }
 
-        static void AddDishToOrder(OrderService orderService, DishService dishService)
+        static void AddDishToOrder(OrderService orderService, DishService dishService, int orderId)
         {
-            if (currentOrder == null)
-            {
-                Console.WriteLine("Спочатку створіть нове замовлення.");
-                return;
-            }
-
             Console.WriteLine("Введіть ID страви, яку хочете додати:");
             if (int.TryParse(Console.ReadLine(), out int dishId))
             {
@@ -168,8 +189,8 @@ namespace FoodDelivery.UI
                     Console.WriteLine("Введіть кількість:");
                     if (int.TryParse(Console.ReadLine(), out int quantity) && quantity > 0)
                     {
-                        orderService.AddDishToOrder(currentOrder, dish, quantity);
-                        Console.WriteLine($"{quantity} x {dish.Name} додано до замовлення {currentOrder.Id}.");
+                        orderService.AddDishToOrder(orderId, dishId, quantity);
+                        Console.WriteLine($"{quantity} x {dish.Name} додано до замовлення {orderId}.");
                     }
                     else
                     {
@@ -187,18 +208,12 @@ namespace FoodDelivery.UI
             }
         }
 
-        static void ViewCurrentOrder(OrderService orderService)
+        static void ViewCurrentOrder(OrderService orderService, int orderId)
         {
-            if (currentOrder == null)
-            {
-                Console.WriteLine("Немає активного замовлення.");
-                return;
-            }
-
-            var orderItems = orderService.GetOrderItems(currentOrder.Id);
+            var orderItems = orderService.GetOrderItems(orderId);
             if (orderItems.Any())
             {
-                Console.WriteLine($"\nВміст замовлення {currentOrder.Id}:");
+                Console.WriteLine($"\nВміст замовлення {orderId}:");
                 decimal total = 0;
                 foreach (var item in orderItems)
                 {
@@ -209,7 +224,7 @@ namespace FoodDelivery.UI
             }
             else
             {
-                Console.WriteLine($"Замовлення {currentOrder.Id} порожнє.");
+                Console.WriteLine($"Замовлення {orderId} порожнє.");
             }
         }
     }
