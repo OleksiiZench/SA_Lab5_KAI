@@ -1,4 +1,4 @@
-﻿namespace SA_Lab5
+﻿namespace SA_Lab4
 {
     internal class Program
     {
