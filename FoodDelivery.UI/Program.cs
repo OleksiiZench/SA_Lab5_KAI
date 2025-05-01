@@ -19,15 +19,11 @@ namespace FoodDelivery.UI
             ConfigureServices(services);
             var serviceProvider = services.BuildServiceProvider();
 
-            // Отримуємо сервіси
-            var dishService = serviceProvider.GetService<DishService>();
-            var menuService = serviceProvider.GetService<MenuService>();
-            var orderService = serviceProvider.GetService<OrderService>();
-
             // Створюємо базу даних, якщо вона ще не існує
-            using (var context = serviceProvider.GetService<AppDbContext>())
+            using (var scope = serviceProvider.CreateScope())
             {
-                context.Database.EnsureCreated();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                dbContext.Database.EnsureCreated();
             }
 
             bool isRunning = true;
@@ -35,68 +31,69 @@ namespace FoodDelivery.UI
 
             while (isRunning)
             {
-                Console.WriteLine("\nОберіть дію:");
-                Console.WriteLine("1. Показати меню за днем тижня");
-                Console.WriteLine("2. Показати страви за категорією");
-                Console.WriteLine("3. Пошук страв за назвою");
-                Console.WriteLine("4. Створити нове замовлення");
-                Console.WriteLine("5. Додати страву до замовлення");
-                Console.WriteLine("6. Переглянути поточне замовлення");
-                Console.WriteLine("7. Вийти");
-                Console.Write("Ваш вибір: ");
-                string choice = Console.ReadLine();
-
-                switch (choice)
+                using (var scope = serviceProvider.CreateScope())
                 {
-                    case "1":
-                        ShowMenuByDay(menuService);
-                        break;
-                    case "2":
-                        ShowDishesByCategory(menuService);
-                        break;
-                    case "3":
-                        SearchDishes(dishService);
-                        break;
-                    case "4":
-                        currentOrder = CreateNewOrder(orderService);
-                        break;
-                    case "5":
-                        if (currentOrder != null)
-                            AddDishToOrder(orderService, dishService, currentOrder.Id);
-                        else
-                            Console.WriteLine("Спочатку створіть нове замовлення.");
-                        break;
-                    case "6":
-                        if (currentOrder != null)
-                            ViewCurrentOrder(orderService, currentOrder.Id);
-                        else
-                            Console.WriteLine("Немає активного замовлення.");
-                        break;
-                    case "7":
-                        isRunning = false;
-                        Console.WriteLine("Дякуємо за використання нашого застосунку!");
-                        break;
-                    default:
-                        Console.WriteLine("Невірний вибір. Спробуйте ще раз.");
-                        break;
+                    var dishService = scope.ServiceProvider.GetRequiredService<DishService>();
+                    var menuService = scope.ServiceProvider.GetRequiredService<MenuService>();
+                    var orderService = scope.ServiceProvider.GetRequiredService<OrderService>();
+
+                    Console.WriteLine("\nОберіть дію:");
+                    Console.WriteLine("1. Показати меню за днем тижня");
+                    Console.WriteLine("2. Показати страви за категорією");
+                    Console.WriteLine("3. Пошук страв за назвою");
+                    Console.WriteLine("4. Створити нове замовлення");
+                    Console.WriteLine("5. Додати страву до замовлення");
+                    Console.WriteLine("6. Переглянути поточне замовлення");
+                    Console.WriteLine("7. Вийти");
+                    Console.Write("Ваш вибір: ");
+                    string choice = Console.ReadLine();
+
+                    switch (choice)
+                    {
+                        case "1":
+                            ShowMenuByDay(menuService);
+                            break;
+                        case "2":
+                            ShowDishesByCategory(menuService);
+                            break;
+                        case "3":
+                            SearchDishes(dishService);
+                            break;
+                        case "4":
+                            currentOrder = CreateNewOrder(orderService);
+                            break;
+                        case "5":
+                            if (currentOrder != null)
+                                AddDishToOrder(orderService, dishService, currentOrder.Id);
+                            else
+                                Console.WriteLine("Спочатку створіть нове замовлення.");
+                            break;
+                        case "6":
+                            if (currentOrder != null)
+                                ViewCurrentOrder(orderService, currentOrder.Id);
+                            else
+                                Console.WriteLine("Немає активного замовлення.");
+                            break;
+                        case "7":
+                            isRunning = false;
+                            Console.WriteLine("Дякуємо за використання нашого застосунку!");
+                            break;
+                        default:
+                            Console.WriteLine("Невірний вибір. Спробуйте ще раз.");
+                            break;
+                    }
                 }
             }
-
-            Console.ReadKey();
         }
 
         private static void ConfigureServices(ServiceCollection services)
         {
-            // Реєструємо DbContext
             services.AddDbContext<AppDbContext>();
 
-            // Реєструємо AutoMapper
             services.AddAutoMapper(typeof(MappingProfile));
 
-            // Реєструємо Unit of Work
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-            // Реєструємо сервіси бізнес-логіки
             services.AddScoped<DishService>();
             services.AddScoped<MenuService>();
             services.AddScoped<OrderService>();

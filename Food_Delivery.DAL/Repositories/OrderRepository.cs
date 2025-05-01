@@ -35,7 +35,6 @@ namespace FoodDelivery.DAL.Repositories
             };
 
             _context.OrderItems.Add(orderItem);
-            SaveChanges();
         }
     }
 }

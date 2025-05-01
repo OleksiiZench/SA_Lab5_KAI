@@ -39,10 +39,5 @@ namespace FoodDelivery.DAL.Repositories
         {
             _dbSet.Remove(entity);
         }
-
-        public void SaveChanges()
-        {
-            _context.SaveChanges();
-        }
     }
 }
